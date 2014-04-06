@@ -35,7 +35,8 @@ def bot():
             # Regex Magic that finds the text encaptured with [[ ]]
             cards = re.findall("\[\[([^\[\]]*)\]\]", comment.body)
             reply = ""
-            for i in cards:
+            # Set removes any duplicates
+            for i in set(cards):
                 print i
                 try:
                     # Converts obscure characters like AE to a URL-valid text
