@@ -7,7 +7,7 @@ import urllib2
 import signal, sys
 
 # This string is sent by praw to reddit in accordance to the API rules
-user_agent = ("REDDIT Bot by /u/USERNAME")
+user_agent = ("REDDIT Bot v1.3 by /u/USERNAME")
 r = praw.Reddit(user_agent=user_agent)
 
 # Fill in the bot's username and password here
