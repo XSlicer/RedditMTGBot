@@ -1,4 +1,4 @@
-#TODO - If the bot (or the server) would crash, it will not keep already parsed comments in a backup database
+#TODO - Parse typo's
 
 import time
 import praw
@@ -25,7 +25,7 @@ with open('magictcg_done.txt', 'r') as f:
         already_done.append(i.replace("\n", ""))
 
 # Function that does all the magic
-def bot():
+def bot_comments():
     ids = []
     sub_comments = subreddit.get_comments()
     for comment in sub_comments:
@@ -35,14 +35,16 @@ def bot():
             # Regex Magic that finds the text encaptured with [[ ]]
             cards = re.findall("\[\[([^\[\]]*)\]\]", comment.body)
             reply = ""
+            # Because a comment can only have a max length, limit to only the first 10 requets
+            if len(cards) > 10: cards = cards[0:10]
             # Set removes any duplicates
             for i in set(cards):
                 print i
                 try:
                     # Converts obscure characters like AE to a URL-valid text
                     j = urllib2.quote(i.encode('utf-8'))
-                    # Opens the Gatherer page and looks for the card ID with Regex
-                    page = urllib2.urlopen("http://gatherer.wizards.com/Pages/Card/Details.aspx?name=%s" % j).read()
+                    # Opens the Gatherer page and looks for the card ID with Regex - Replaces & because it breaks URLs
+                    page = urllib2.urlopen("http://gatherer.wizards.com/Pages/Card/Details.aspx?name=%s" % j.replace("&", "%26")).read()
                     card_id = re.search("multiverseid=([0-9]*)", page).group(1)
                 except AttributeError:
                     card_id = False
@@ -51,23 +53,38 @@ def bot():
                     # Builds the post
                     reply += "[%s](http://gatherer.wizards.com/Handlers/Image.ashx?multiverseid=%s&type=card&.jpg)" % (i, card_id)
                     reply += " - "
-                    reply += "[Gatherer Page](http://gatherer.wizards.com/Pages/Card/Details.aspx?name=%s)" % j
+                    reply += "[Gatherer](http://gatherer.wizards.com/Pages/Card/Details.aspx?name=%s)" % j
+                    reply += ", [MagicCards](http://magiccards.info/query?q=!%s)" % j
                     reply += "\n\n"
             # If a post was built before, complete it and post it to reddit
             if reply:
-                core = "The following cards have been requested to be linked by the comment:\n\n"
                 reply += "^^Questions? ^^Message ^^/u/CREATOR ^^- ^^Call ^^cards ^^with ^^[[CARDNAME]] ^^- ^^Format: ^^Image ^^- ^^URL ^^to ^^Gatherer"
-                comment.reply(core + reply)
+                # Possible advice text to advice using "AutocardAnywhere" instead
+                #reply += "\n\n^^^Try ^^^the ^^^browser ^^^plugin ^^^'AutocardAnywhere' ^^^instead ^^^of ^^^the ^^^bot: ^^^Personal ^^^card-links!"
+                # Posting might fail (too long, ban, reddit down etc), so cancel the post and print the error
+                try:
+                    comment.reply(reply)
+                except Exception,e: print str(e)
             # Add the post to the list of parsed comments
             already_done.append(comment.id)
     # Finally, return the list of parsed comments (seperate from already_done)
     return ids
 
-# Function that is called when ctrl-c is pressed. It backups the current parsed comments into a backup file and then quits.
-def signal_handler(signal, frame):
+## Work in progress - Parses submissions
+#def bot_submissions():
+#    sub_ids = []
+#    sub_submissions = subreddit.get_submissions()
+#    for submission in sub_submissions:
+
+# Function that backs up current parsed comments
+def write_comments():
     with open("magictcg_done.txt", "w") as f:
         for i in already_done:
             f.write(str(i) + '\n')
+
+# Function that is called when ctrl-c is pressed. It backups the current parsed comments into a backup file and then quits.
+def signal_handler(signal, frame):
+    write_comments()
     sys.exit(0)
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -81,4 +98,6 @@ while True:
         if i in ids:
             new_done.append(i)
     already_done = new_done[:]
+    # Back up the parsed comments to a file
+    write_comments()
     time.sleep(15)
